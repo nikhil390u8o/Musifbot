@@ -4,3 +4,4 @@ youtube-dl==2021.12.17
 uvicorn==0.30.6 
 starlette==0.38.2 
 ffmpeg-python==0.2.0
+TgCrypto
