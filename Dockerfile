@@ -1,36 +1,14 @@
-FROM python:3.9-slim
+FROM python:3.9
 
-# Install system dependencies for pytgcalls, youtube-dl, and ffmpeg-python
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    libavcodec-dev \
-    libavformat-dev \
-    libavutil-dev \
-    libswscale-dev \
-    libopus-dev \
-    pkg-config \
-    python3-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
+# Set work directory
 WORKDIR /app
 
-# Upgrade pip to avoid version-related issues
-RUN pip install --no-cache-dir --upgrade pip
-
-# Copy requirements and install
+# Copy requirements and install with forced reinstall to avoid bad cache
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt --retries 5
+RUN pip install --no-cache-dir -r requirements.txt --upgrade --force-reinstall
 
-# Create downloads directory for youtube-dl
-RUN mkdir -p /app/downloads
-
-# Copy application code
+# Copy all your code
 COPY . .
 
-# Expose port for starlette/uvicorn
-EXPOSE 8000
-
-# Run the application
-CMD ["python", "main.py"]
+# Run the bot
+CMD ["python3", "main.py"]
