@@ -25,7 +25,6 @@ API_ID = os.environ.get("API_ID")
 API_HASH = os.environ.get("API_HASH")
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 SESSION_STRING = os.environ.get("SESSION_STRING")
-URL = os.environ.get("RENDER_EXTERNAL_URL", "https://your-render-app.onrender.com")
 PORT = int(os.environ.get("PORT", 8000))
 
 # Initialize Pyrogram client and PyTgCalls
