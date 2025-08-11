@@ -1,6 +1,6 @@
 pyrogram==2.0.106
+tgcrypto
 pytgcalls==2.1.0
-TgCrypto
-youtube_dl
 starlette
 uvicorn
+youtube_dl
