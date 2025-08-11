@@ -1,4 +1,4 @@
-FROM python:3. Ascendancy
+FROM python:3.9-slim
 
 # Install ffmpeg and additional dependencies
 RUN apt-get update && apt-get install -y \
