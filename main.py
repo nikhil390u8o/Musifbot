@@ -3,8 +3,7 @@ import os
 import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from pytgcalls import PyTgCalls, StreamType
-from pytgcalls.types.input_stream import InputAudioStream
+from pytgcalls import GroupCallFactory
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
