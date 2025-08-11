@@ -1,6 +1,7 @@
 import asyncio
 import os
 import logging
+
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pytgcalls import GroupCallFactory
@@ -11,30 +12,34 @@ from starlette.routing import Route
 import uvicorn
 import youtube_dl
 
-# Enable logging
+# Logging config
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
+logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
-logger = logging.getLogger(name)
 
-# Configuration constants
-API_ID = os.environ.get("API_ID")
-API_HASH = os.environ.get("API_HASH")
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-SESSION_STRING = os.environ.get("SESSION_STRING")
+# Env vars
+API_ID = int(os.environ.get("API_ID", 0))
+API_HASH = os.environ.get("API_HASH", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+SESSION_STRING = os.environ.get("SESSION_STRING", None)
 PORT = int(os.environ.get("PORT", 8000))
 
-# Initialize Pyrogram client and PyTgCalls
-app = Client(
+# Pyrogram client
+bot = Client(
     "music_bot",
     api_id=API_ID,
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
     session_string=SESSION_STRING
 )
-call_handler = GroupCallFactory(app).get_file_group_call()
+
+# PyTgCalls
+call_factory = GroupCallFactory(bot)
+call_handler = call_factory.get_file_group_call()
+
 # YouTube download options
 ydl_opts = {
     'format': 'bestaudio/best',
@@ -46,18 +51,22 @@ ydl_opts = {
     }],
 }
 
-async def download_youtube_audio(url):
-    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        filename = ydl.prepare_filename(info).replace('.webm', '.mp3').replace('.m4a', '.mp3')
-        return filename
+async def download_youtube_audio(url: str) -> str:
+    """Download audio from YouTube and return local filename."""
+    loop = asyncio.get_event_loop()
+    def run_ydl():
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info).replace('.webm', '.mp3').replace('.m4a', '.mp3')
+            return filename
+    filename = await loop.run_in_executor(None, run_ydl)
+    return filename
 
-# Bot command handlers
-@app.on_message(filters.command("start"))
+@bot.on_message(filters.command("start"))
 async def start_command(client: Client, message: Message):
     await message.reply_text("🎵 Music Bot is online! Use /play <YouTube URL> to play music in voice chat.")
 
-@app.on_message(filters.command("play"))
+@bot.on_message(filters.command("play"))
 async def play_command(client: Client, message: Message):
     if len(message.command) < 2:
         await message.reply_text("Please provide a YouTube URL. Usage: /play <YouTube URL>")
@@ -65,15 +74,16 @@ async def play_command(client: Client, message: Message):
     url = message.command[1]
     chat_id = message.chat.id
     try:
+        await message.reply_text("⏳ Downloading audio, please wait...")
         filename = await download_youtube_audio(url)
-        call_handler.input_filename = filename   # <-- THIS LINE
+        call_handler.input_filename = filename
         await call_handler.start(chat_id)
         await message.reply_text(f"🎶 Now playing: {filename}")
     except Exception as e:
         logger.error(f"Error playing audio: {e}")
         await message.reply_text(f"Error: {str(e)}")
 
-@app.on_message(filters.command("stop"))
+@bot.on_message(filters.command("stop"))
 async def stop_command(client: Client, message: Message):
     chat_id = message.chat.id
     try:
@@ -83,8 +93,31 @@ async def stop_command(client: Client, message: Message):
         logger.error(f"Error stopping audio: {e}")
         await message.reply_text(f"Error: {str(e)}")
 
-# Webhook and health check handlers
+# Health check endpoint
+async def health(request: Request) -> PlainTextResponse:
+    return PlainTextResponse("OK")
+
+# Telegram webhook handler (optional if you want to use webhook)
 async def telegram_webhook(request: Request) -> Response:
-    """Handle incoming Telegram updates."""
     update = await request.json()
-    await app.process
+    await bot.process_updates([update])
+    return PlainTextResponse("OK")
+
+# Starlette app routes
+routes = [
+    Route("/", health),
+    Route("/webhook", telegram_webhook, methods=["POST"]),
+]
+
+web_app = Starlette(debug=True, routes=routes)
+
+async def main():
+    await bot.start()
+    logger.info("Bot started!")
+    # Run web server concurrently with bot
+    config = uvicorn.Config(web_app, host="0.0.0.0", port=PORT, log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
+
+if __name__ == "__main__":
+    asyncio.run(main())
