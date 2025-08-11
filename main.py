@@ -76,8 +76,11 @@ async def play_command(client: Client, message: Message):
     try:
         await message.reply_text("⏳ Downloading audio, please wait...")
         filename = await download_youtube_audio(url)
-        call_handler.input_filename = filename
-        await call_handler.start(chat_id)
+        
+        chat = await bot.get_chat(chat_id)           # Get chat object first
+        call_handler.input_filename = filename        # Set audio file before start
+        await call_handler.start(chat.id)             # Start call with valid chat id
+        
         await message.reply_text(f"🎶 Now playing: {filename}")
     except Exception as e:
         logger.error(f"Error playing audio: {e}")
