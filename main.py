@@ -65,11 +65,9 @@ async def play_command(client: Client, message: Message):
     url = message.command[1]
     chat_id = message.chat.id
     try:
-        # Download audio
         filename = await download_youtube_audio(url)
-        # Join voice chat and play audio
+        call_handler.input_filename = filename   # <-- THIS LINE
         await call_handler.start(chat_id)
-call_handler.input_filename = filename
         await message.reply_text(f"🎶 Now playing: {filename}")
     except Exception as e:
         logger.error(f"Error playing audio: {e}")
