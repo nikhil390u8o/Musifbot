@@ -34,8 +34,7 @@ app = Client(
     bot_token=BOT_TOKEN,
     session_string=SESSION_STRING
 )
-call_handler = PyTgCalls(app)
-
+call_handler = GroupCallFactory(app).get_file_group_call()
 # YouTube download options
 ydl_opts = {
     'format': 'bestaudio/best',
