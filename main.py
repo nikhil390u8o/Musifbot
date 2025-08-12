@@ -1,7 +1,8 @@
 import asyncio
 import os
 import logging
-
+from pyrogram.raw import functions
+from pyrogram.errors import RPCError
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pytgcalls import GroupCallFactory
@@ -62,11 +63,6 @@ async def download_youtube_audio(url: str) -> str:
     filename = await loop.run_in_executor(None, run_ydl)
     return filename
 
-@bot.on_message(filters.command("start"))
-async def start_command(client, message):
-    logger.info(f"Received /start from {message.from_user.id}")
-    await message.reply_text("🎵 Music Bot is online!")
-
 @bot.on_message(filters.command("play"))
 async def play_command(client: Client, message: Message):
     if len(message.command) < 2:
@@ -77,11 +73,24 @@ async def play_command(client: Client, message: Message):
     try:
         await message.reply_text("⏳ Downloading audio, please wait...")
         filename = await download_youtube_audio(url)
-        
-        chat = await bot.get_chat(chat_id)           # Get chat object first
-        call_handler.input_filename = filename        # Set audio file before start
-        await call_handler.start(chat.id)             # Start call with valid chat id
-        
+
+        # Try to fetch full channel info to cache the chat properly
+        try:
+            await bot.invoke(functions.channels.GetFullChannel(channel=chat_id))
+        except RPCError as e:
+            # Could not get channel info - possibly bot not in channel/group
+            logger.warning(f"Could not resolve chat {chat_id}: {e}")
+            await message.reply_text(
+                "⚠️ Bot is not a member of this chat or doesn't have access."
+            )
+            return
+
+        chat = await bot.get_chat(chat_id)
+        logger.info(f"Starting group call in chat: {chat.id} / {chat.title}")
+
+        call_handler.input_filename = filename
+        await call_handler.start(chat.id)
+
         await message.reply_text(f"🎶 Now playing: {filename}")
     except Exception as e:
         logger.error(f"Error playing audio: {e}")
