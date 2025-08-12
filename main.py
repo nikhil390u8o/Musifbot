@@ -63,8 +63,9 @@ async def download_youtube_audio(url: str) -> str:
     return filename
 
 @bot.on_message(filters.command("start"))
-async def start_command(client: Client, message: Message):
-    await message.reply_text("🎵 Music Bot is online! Use /play <YouTube URL> to play music in voice chat.")
+async def start_command(client, message):
+    logger.info(f"Received /start from {message.from_user.id}")
+    await message.reply_text("🎵 Music Bot is online!")
 
 @bot.on_message(filters.command("play"))
 async def play_command(client: Client, message: Message):
