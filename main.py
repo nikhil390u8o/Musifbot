@@ -7,6 +7,21 @@ from pyrogram.errors import RPCError
 from pytgcalls import GroupCallFactory
 import yt_dlp
 import shutil
+import uvicorn
+from starlette.applications import Starlette
+from starlette.responses import PlainTextResponse
+from starlette.routing import Route
+
+async def homepage(request):
+    return PlainTextResponse("Bot is alive!")
+
+app = Starlette(routes=[
+    Route("/", homepage)
+])
+
+if name == "main":
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
 
 # ---------- CONFIG ----------
 API_ID = int(os.environ.get("API_ID", "0"))
