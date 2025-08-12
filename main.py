@@ -1,106 +1,54 @@
 import asyncio
-import os
 import logging
 from pyrogram import Client, filters
-from pyrogram.types import Message
-from pytgcalls import GroupCallFactory
-import yt_dlp
-import shutil
-import uvicorn
+from pytgcalls import PyTgCalls
 from starlette.applications import Starlette
 from starlette.responses import PlainTextResponse
 from starlette.routing import Route
+import uvicorn
 
-# ---------- CONFIG ----------
-API_ID = int(os.environ.get("API_ID", "0"))
-API_HASH = os.environ.get("API_HASH", "")
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-
-# ---------- logging ----------
+# ===== Logging =====
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
-logger = logging.getLogger(__name__)
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
-# ---------- bot ----------
-bot = Client("music_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
-call_factory = GroupCallFactory(bot)
-call_handler = call_factory.get_file_group_call()
+# ===== Bot Config =====
+API_ID = int("20898349")  # your API_ID
+API_HASH = "9fdb830d1e435b785f536247f49e7d87"
+BOT_TOKEN = "8120599964:AAEVkZP8yCJMWmRZV1a7N7WwaPxq5yVGW_A"
 
-# ---------- downloader ----------
-ydl_opts = {
-    "format": "bestaudio/best",
-    "outtmpl": "downloads/%(id)s.%(ext)s",
-    "noplaylist": True,
-    "quiet": True,
-    "no_warnings": True,
-    "ignoreerrors": True,
-    "restrictfilenames": True,
-}
-os.makedirs("downloads", exist_ok=True)
+bot = Client("bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
+call = PyTgCalls(bot)
 
-async def download_audio(url: str) -> str:
-    loop = asyncio.get_event_loop()
-    def _dl():
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            base, ext = os.path.splitext(filename)
-            mp3_file = f"{base}.mp3"
-            if ext.lower() != ".mp3" and shutil.which("ffmpeg"):
-                os.system(f'ffmpeg -y -i "{filename}" -vn -acodec libmp3lame -ar 44100 -ac 2 -b:a 192k "{mp3_file}"')
-                os.remove(filename)
-                return mp3_file
-            return filename
-    return await loop.run_in_executor(None, _dl)
-
-# ---------- handlers ----------
-@bot.on_message(filters.command("ping"))
-async def ping_cmd(_, message: Message):
-    await message.reply_text("🏓 Pong!")
-
-@bot.on_message(filters.command("play") & (filters.group | filters.channel))
-async def play_command(_, message: Message):
-    if len(message.command) < 2:
-        return await message.reply_text("Usage: /play <YouTube URL>")
-    url = message.command[1]
-    chat_id = message.chat.id
-    await message.reply_text("⏳ Downloading audio...")
-    filename = await download_audio(url)
-    call_handler.input_filename = filename
-    await call_handler.start(chat_id)
-    await message.reply_text(f"🎶 Playing `{os.path.basename(filename)}`")
-
-@bot.on_message(filters.command("stop") & (filters.group | filters.channel))
-async def stop_command(_, message: Message):
-    await call_handler.leave_group_call(message.chat.id)
-    await message.reply_text("⏹️ Stopped.")
-
-# ---------- Starlette ----------
+# ===== Starlette Web Server =====
 async def homepage(request):
     return PlainTextResponse("Bot is alive!")
 
 app = Starlette(routes=[Route("/", homepage)])
 
-# ---------- run both ----------
-async def main():
+# ===== Pyrogram Handlers =====
+@bot.on_message(filters.command("start") & filters.private)
+async def start_command(client, message):
+    await message.reply("Hello! I'm working fine ✅")
+
+# ===== Main Startup =====
+async def start_all():
+    # Start Pyrogram
     await bot.start()
-    logger.info("Bot started")
+    logging.info("Pyrogram started ✅")
 
-    config = uvicorn.Config(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), log_level="info")
+    # Start PyTgCalls
+    await call.start()
+    logging.info("PyTgCalls started ✅")
+
+    # Start Uvicorn (Starlette)
+    config = uvicorn.Config(app, host="0.0.0.0", port=10000, loop="asyncio")
     server = uvicorn.Server(config)
+    await server.serve()
 
-    # Run both bot and server until stopped
-    await asyncio.gather(
-        server.serve(),   # web server
-        bot.loop.create_future()  # keeps the bot running
-    )
+async def main():
+    await start_all()
 
 if __name__ == "__main__":
-    try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        logger.info("Shutting down...")
-        asyncio.run(bot.stop())
+    asyncio.run(main())
