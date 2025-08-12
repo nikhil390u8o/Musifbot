@@ -1,14 +1,12 @@
 import asyncio
 import os
 import logging
-from pyrogram.raw import functions
-from pyrogram.errors import RPCError
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pytgcalls import GroupCallFactory
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse, Response
+from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 import uvicorn
 import youtube_dl
@@ -25,16 +23,14 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 API_ID = int(os.environ.get("API_ID", 0))
 API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
-SESSION_STRING = os.environ.get("SESSION_STRING", None)
 PORT = int(os.environ.get("PORT", 8000))
 
-# Pyrogram client
+# Pyrogram bot
 bot = Client(
     "music_bot",
     api_id=API_ID,
     api_hash=API_HASH,
-    bot_token=BOT_TOKEN,
-    session_string=SESSION_STRING
+    bot_token=BOT_TOKEN
 )
 
 # PyTgCalls
@@ -70,26 +66,17 @@ async def play_command(client: Client, message: Message):
         return
     url = message.command[1]
     chat_id = message.chat.id
+
     try:
         await message.reply_text("⏳ Downloading audio, please wait...")
         filename = await download_youtube_audio(url)
 
-        # Try to fetch full channel info to cache the chat properly
-        try:
-            chat = await bot.get_chat(chat_id)
-            logger.info(f"Resolved chat {chat.id} / {chat.title}")
-        except RPCError as e:
-            logger.warning(f"Could not resolve chat {chat_id}: {e}")
-            await message.reply_text(
-                "⚠️ Bot is not a member of this chat or doesn't have access."
-            )
-            return
+        # Ensure the bot has cached the chat to avoid peer errors
+        await bot.get_chat(chat_id)
 
-        chat = await bot.get_chat(chat_id)
-        logger.info(f"Starting group call in chat: {chat.id} / {chat.title}")
-
+        # Start playing in the VC
         call_handler.input_filename = filename
-        await call_handler.start(chat.id)
+        await call_handler.start(chat_id)
 
         await message.reply_text(f"🎶 Now playing: {filename}")
     except Exception as e:
@@ -106,31 +93,22 @@ async def stop_command(client: Client, message: Message):
         logger.error(f"Error stopping audio: {e}")
         await message.reply_text(f"Error: {str(e)}")
 
-# Health check endpoint
+# Health check
 async def health(request: Request) -> PlainTextResponse:
     return PlainTextResponse("OK")
 
-# Telegram webhook handler (optional if you want to use webhook)
-async def telegram_webhook(request: Request) -> Response:
-    update = await request.json()
-    await bot.process_updates([update])
-    return PlainTextResponse("OK")
-
-# Starlette app routes
+# Routes
 routes = [
     Route("/", health),
-    Route("/webhook", telegram_webhook, methods=["POST"]),
 ]
-
 web_app = Starlette(debug=True, routes=routes)
 
-async def main():
+async def start_all():
     await bot.start()
     logger.info("Bot started!")
-    # Run web server concurrently with bot
     config = uvicorn.Config(web_app, host="0.0.0.0", port=PORT, log_level="info")
     server = uvicorn.Server(config)
-    await server.serve()
+    await asyncio.gather(server.serve())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(start_all())
