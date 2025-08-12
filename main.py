@@ -88,13 +88,14 @@ app = Starlette(routes=[Route("/", homepage)])
 async def main():
     await bot.start()
     logger.info("Bot started")
+
     config = uvicorn.Config(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), log_level="info")
     server = uvicorn.Server(config)
-    
-    # Run bot idle loop & web server together
+
+    # Run both bot and server until stopped
     await asyncio.gather(
-        server.serve(),
-        bot.idle()
+        server.serve(),   # web server
+        bot.loop.create_future()  # keeps the bot running
     )
 
 if __name__ == "__main__":
