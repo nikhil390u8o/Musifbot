@@ -74,16 +74,15 @@ async def play_command(client: Client, message: Message):
         await message.reply_text("⏳ Downloading audio, please wait...")
         filename = await download_youtube_audio(url)
 
-        # Try to fetch full channel info to cache the chat properly
         try:
-            await bot.invoke(functions.channels.GetFullChannel(channel=chat_id))
-        except RPCError as e:
-            # Could not get channel info - possibly bot not in channel/group
-            logger.warning(f"Could not resolve chat {chat_id}: {e}")
-            await message.reply_text(
-                "⚠️ Bot is not a member of this chat or doesn't have access."
-            )
-            return
+    chat = await bot.get_chat(chat_id)
+    logger.info(f"Resolved chat {chat.id} / {chat.title}")
+except RPCError as e:
+    logger.warning(f"Could not resolve chat {chat_id}: {e}")
+    await message.reply_text(
+        "⚠️ Bot is not a member of this chat or doesn't have access."
+    )
+    return
 
         chat = await bot.get_chat(chat_id)
         logger.info(f"Starting group call in chat: {chat.id} / {chat.title}")
