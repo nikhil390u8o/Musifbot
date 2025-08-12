@@ -3,4 +3,4 @@ tgcrypto
 pytgcalls==2.1.0
 starlette
 uvicorn
-youtube_dl
+yt_dlp
