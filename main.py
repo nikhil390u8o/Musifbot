@@ -3,7 +3,6 @@ import os
 import logging
 from pyrogram import Client, filters
 from pyrogram.types import Message
-from pyrogram.errors import RPCError
 from pytgcalls import GroupCallFactory
 import yt_dlp
 import shutil
@@ -17,7 +16,7 @@ API_ID = int(os.environ.get("API_ID", "0"))
 API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 
-# -------- logging ----------
+# ---------- logging ----------
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     level=logging.INFO
@@ -50,11 +49,10 @@ async def download_audio(url: str) -> str:
             filename = ydl.prepare_filename(info)
             base, ext = os.path.splitext(filename)
             mp3_file = f"{base}.mp3"
-            if ext.lower() != ".mp3":
-                if shutil.which("ffmpeg"):
-                    os.system(f'ffmpeg -y -i "{filename}" -vn -acodec libmp3lame -ar 44100 -ac 2 -b:a 192k "{mp3_file}"')
-                    os.remove(filename)
-                    return mp3_file
+            if ext.lower() != ".mp3" and shutil.which("ffmpeg"):
+                os.system(f'ffmpeg -y -i "{filename}" -vn -acodec libmp3lame -ar 44100 -ac 2 -b:a 192k "{mp3_file}"')
+                os.remove(filename)
+                return mp3_file
             return filename
     return await loop.run_in_executor(None, _dl)
 
@@ -88,12 +86,16 @@ app = Starlette(routes=[Route("/", homepage)])
 
 # ---------- run both ----------
 async def main():
-    # Run bot and webserver together
     await bot.start()
     logger.info("Bot started")
     config = uvicorn.Config(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), log_level="info")
     server = uvicorn.Server(config)
-    await server.serve()
+    
+    # Run bot idle loop & web server together
+    await asyncio.gather(
+        server.serve(),
+        bot.idle()
+    )
 
 if __name__ == "__main__":
     try:
