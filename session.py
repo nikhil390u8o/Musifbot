@@ -5,6 +5,6 @@ async def main():
         session = await app.export_session_string()
         print(f"Session string: {session}")
 
-if name == "main":
+if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
